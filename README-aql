@@ -1,0 +1,261 @@
+README for AQL implementation for SIB.
+
+       Author: Sami Kiminki (skiminki *at* users.sourceforge.net)
+ Last updated: 2009-07-01
+
+
+1. Introduction
+===============
+
+AQL (Abstract Query Language) is an intermediate query language for
+relational queries on RDF stores. The primary motivation for its
+existence is that it provides isolation between the store
+implementation and query front-ends, such as query parsers or
+object-RDF-mappers. We hope to see SPARQL query front-end and DIEM
+mediator as examples of front-ends in future.
+
+Compared to front-end query languages, AQL is not intended to be used
+directly via human-writable textual interface. Instead, AQL queries
+are represented by server-side internal data structures (see struct
+AQLQuery in AQLModel.h). In this, AQL is analogous to abstract syntax
+trees (AST) used in many compilers. AQL does have, however, a
+front-end using simple list syntax, but that is for debugging purposes
+only and cannot be considered stable between releases. In other words,
+don't use it in your regular client applications.
+
+AQL contains the most common query constructs and should be functional
+enough to host most SPARQL queries. AQL constructs include selects,
+left/inner joins with conditions, criteria, sorting and result
+limits. For expressions (used by constructs), AQL supports regular
+literals, node references and values, functions and logical
+expressions. These are described below in more detail. Notably, AQL
+does not support projections, aggregate functions and nested
+joins. Though, this may change in future releases.
+
+
+2. Query processing
+===================
+
+AQL query consists of joins, selects, query criterion, sorts and
+result limits. Joins tell what triples are joined to the root triple,
+selects tell how the final result is formed, query criterion is the
+criterion expression for data used to form the result, sorts tell how
+to sort the data and limits tell how many result rows and from what
+row offset the final result should have.
+
+Query processing steps: (conceptual)
+For examples, we assume the following triples in the store:
+- (A,P,B)
+- (A,P,C)
+- (D,P,A)
+
+1) Fetch all triples from the store, one triple per row. This column
+   is called the root join. So, the intermediate result for our
+   example would be
+    (A,P,B)
+    (A,P,C)
+    (D,P,A)
+
+2) Process joins. For each join, join all triples in the store to
+   intermediate result rows using cartesian product, but only if join
+   condition (a.k.a. join predicate) is satisfied. If not:
+    - inner join, unsatisfying row is discarded
+    - left join, unsatisfying row is discarded. However, if no rows
+      from the right-hand (i.e. the newly joined triple) column
+      satisfies condition for a left-hand columns, extend that row
+      with triple containing nulls.
+
+   Example: root joined with inner join (j1), condition is
+   root.subject = j1.subject
+    (A,P,B), (A,P,B)
+    (A,P,B), (A,P,C)
+    (A,P,C), (A,P,B)
+    (A,P,C), (A,P,C)
+    (D,P,A), (D,P,A)
+
+   Example: root joined with left join (j1), condition is
+   root.object = j1.subject
+    (A,P,B), (NULL,NULL,NULL)
+    (A,P,C), (NULL,NULL,NULL)
+    (D,P,A), (A,P,B)
+    (D,P,A), (A,P,C)
+    
+3) Discard all rows from intermediate result, which do not satisfy the
+   query criterion.
+
+   Example: root join, criterion is root.subject='D'
+    (D,P,A)
+
+4) Order the intermediate result by sorts. If there is more than on
+   sort, the first sort expression is used first. If two or more
+   consecutive rows evaluate equal value from the  sort expression,
+   use the second sort expression, and so on.
+
+   Example: root join with sorts root.subject descending and
+            root.object ascending
+    (D,P,A)
+    (A,P,B)
+    (A,P,C)
+
+5) Process selects for each intermediate result row. This constructs
+   the final result.
+
+   Example: root join with selects root.subject,
+            concatenate(root.object, root.predicate)
+
+   Column 1  Column 2
+   A         BP
+   A         CP
+   D         AP
+
+6) Process limits. The result is returned to the client by starting
+   with offset row (first row has offset 0) and then returning at most
+   the number of maximum rows.
+
+   Example: root join, offset = 1, max rows = 1
+    (A,P,C)
+
+
+3. AQL Query Elements
+=====================
+
+3.1. AQLQuery
+-------------
+List representation: (aql-query <sub-element>* )
+
+AQLQuery represents an AQL query. It consists of lists of selects,
+joins and sorts, in addition to optional criterion and limits.
+
+In list representation, sub-element is any of select, join, criterion,
+result-max-rows, result-row-offset.
+
+Multiple criterion elements can be declared in list syntax. These are
+combined into conjunction (and) with multiple terms, i.e., each
+criterion must be met.
+
+3.2. AQLSelect
+--------------
+List representation: (select <name> <expression>)
+
+AQLSelect represents a named select expression. <name> is the column
+name in final result and <expression> is the expression evaluated per
+each row to obtain the row/column value.
+
+
+3.3. AQLJoin
+------------
+List representation: (join <join-type> <name> <condition-expr>? )
+
+AQLJoin represents a named join. <join-type> is either left or inner
+for corresponding join types. <name> is the join name. The optional
+<condition-expr> specifies the join condition expression.
+
+3.4. AQLSort
+------------
+List representation: (sort <direction> <sort-expr>)
+
+AQLSort represents a sort. Direction is either ascending or
+descending. Sort expression evaluates the sort key.
+
+
+3.5. Expressions
+----------------
+
+3.5.1. Literal and property expressions
+---------------------------------------
+
+a) AQLLiteralExpr
+List representation: (literal <literal-expr>)
+
+Represents a literal (i.e. "as-is") expression. The expression must be
+UTF-8 string enclosed within quotation marks ("). The escape character
+is backslash (\) and the following escapes are defined:
+  \\ - backslash (\)
+  \n - newline
+  \r - carriage return
+  \" - quotation mark
+
+The following escapes are defined but currently not implemented:
+  \xXX       - byte in UTF-8 stream, byte value XX (2-digit
+               hexadecimal)
+  \uXXXX     - unicode character, codepoint XXXX (4-digit hexadecimal)
+  \UXXXXXXXX - unicode character, codepoint XXXXXXXX (8-digit
+               hexadecimal)
+
+
+b) AQLPropertyExpr
+List representation: (property <join-name> property)
+
+Represents value of triple property. Property is either subject,
+predicate or object.
+
+Example: (property "root" subject)
+
+This evaluates subject node of root join triple.
+
+
+c) AQLPropertyReferenceExpr
+List representation: none
+
+Represents reference to triple property. Used only internally to
+optimize, e.g., comparisons, where it is unnecessary to compare actual
+node values, as comparing node references (i.e. node id) suffice. You
+shouldn't probably use this directly.
+
+
+3.5.2. Logical expressions
+--------------------------
+a) AQLJunctionCriterion
+List representation of conjunction: (and [term-expr]*)
+List representation of disjunction: (or [term-expr]*)
+
+Represents conjunction or disjunction. For conjunction the semantics
+are as follows. If any term-expr evaluates false (i.e. zero, etc),
+conjunction evaluates 0.
+
+For disjunction the semantics are as follows. If any term-expr
+evaluates true (i.e. non-zero, etc) disjunction evaluates 1.
+
+
+b) AQLComparisonCriterion
+List representation of equals:     (comp-eq <expr1> <expr2>)
+List representation of not equals: (comp-ne <expr1> <expr2>)
+
+Compares <expr1> and <expr2>. comp-eq returns 1 if expressions equal,
+otherwise it returns 0. comp-ne is the opposite.
+
+
+c) AQLNotExpression
+List representation of not equals: (not <expr>)
+
+Represents logical negation. If <expr> is true (i.e. non-zero, etc)
+not evaluates 0. Otherwise not evaluates 1.
+
+
+3.5.3. Functions, AQLFunctionExpr
+---------------------------------
+List representation: (function <name> [param-expr1] ...)
+
+Represents function evaluation. The function name is <name> and the
+parameters are evaluated by param-expressions.
+
+Available functions:
+
+Name        Arguments Description
+=========== ========= ================================================
+abs                 1 Returns absolute numeric value of param-expr1
+coalesce         0..N Returns first non-null param-expr   
+concatenate      0..N Concatenates string values of expressions
+length              1 Returns length of the string expression
+random              0 Returns random number
+to-lower            1 Returns lower-case value of param-expr1
+to-upper            1 Returns upper-case value of param-expr1
+type-of             1 Returns type of expression value
+
+
+4. Final notes
+==============
+See tests/aql-parse-test -files for examples. The AQL list parser is
+implemented in AQLLispParser.cpp and function list in
+AQLToSQLTranslator.cpp. The program `aqltester' can be used to test
+and execute AQL queries.

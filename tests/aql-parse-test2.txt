@@ -1,0 +1,11 @@
+ ( aql-query
+   ( select "label1" ( function "to-upper" (property "root" subject) ) )
+   ( select "label4" ( function "concatenate" ) )
+   ( select "label2" ( property "root" object ) )
+   ( select "label3" ( property "root" predicate ) )
+   ( criterion ( comp-eq ( property "root" subject ) ( literal "xyzzyz\n\"" ) ) ) 
+   ( criterion ( or ( and ) (comp-ne ( property "root" subject ) ( literal "xyzzy'za\n\"" ) ) ( comp-eq ( property "root" object ) ( literal "x2" ) ) ( comp-eq ( property "root" subject ) ( literal "x3" ) ) )) 
+   ( join left "optional1" ( comp-eq ( property "root" object ) (property "optional1" subject ) ) )
+   ( join inner "optional2" ( comp-eq ( property "root" object ) (property "optional2" subject ) ) )
+
+) 

@@ -1,0 +1,19 @@
+You need the following libraries:
+
+- libcurl, from http://curl.haxx.se/download.html
+- libraptor, from http://download.librdf.org/
+- libsqlite3, from http://sqlite.org/download.html
+
+To install:
+
+1) cd to the directory where this README file is located
+2) make
+3) sudo make install
+
+Step #2 will also build some sample programs you can study.
+
+To run OINK:
+
+1) cd ../oink/src
+2) python runoink.py --file=../oink.data --seed
+3) visit http://localhost:8081/

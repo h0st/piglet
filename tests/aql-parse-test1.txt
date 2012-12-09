@@ -1,0 +1,22 @@
+( aql-query
+   ( select "subj" ( property "root" subject ) )
+   ( select "pred" ( property "root" predicate ) )
+   ( select "obj" ( property "root" object ) )
+
+   ( select "subj2" ( property "optional1" subject ) )
+   ( select "pred2" ( property "optional1" predicate ) )
+   ( select "obj2" ( property "optional1" object ) )
+   
+   ( select "and" ( comp-eq ( property "root" object ) (property "optional1" subject )  ) )
+
+   ( select "subj+pred+obj" ( function "concatenate" (property "root" subject) (literal ", ") (property "root" predicate)(literal ", ")(property "root" object)) )
+
+   ( join left "optional1" ( comp-eq ( property "root" object ) (property "optional1" subject ) ) )
+ 
+   ( criterion (not (and (comp-eq (property "root" subject ) (literal "http://www.lassila.org/")) (comp-eq (property "root" subject ) (literal "http://www.lassila.org/")))))
+
+   ( sort ascending (property "root" subject) )
+ 
+   ( result-max-rows 10 )
+   ( result-row-offset 0 )
+) 
