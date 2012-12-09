@@ -18,7 +18,7 @@ CHEADERS = cpiglet.h
 CFLAGSAUX = -fPIC
 LDFLAGSAUX =
 DYNFLAG = -shared
-CFLAGS = -g
+CFLAGS = -g -I/usr/include/raptor1
 
 ifeq ($(OSTYPE), darwin)
 	LIBRARY = libpiglet.dylib
@@ -80,10 +80,12 @@ $(LIBRARY) : $(libobjects)
 
 #  Sample programs
 
-samples : c++piglet-sample cpiglet-sample m3-cpiglet-sample aqltester
+#SMART-12 samples : c++piglet-sample cpiglet-sample m3-cpiglet-sample aqltester
+samples : 
+	echo "#BUG SMART-12"
 
 c++piglet-sample : $(LIBRARY) $(OBJ)c++piglet-main.o
-	$(CC) -o c++piglet-sample -L. -lpiglet $(LDFLAGS) $(OBJ)c++piglet-main.o
+	$(CXX) -o c++piglet-sample -L. -lpiglet $(LDFLAGS) $(OBJ)c++piglet-main.o
 
 $(OBJ)c++piglet-main.o : $(SRC)c++piglet-main.cpp $(SRC)piglet.h
 	$(CXX) -c $(CFLAGS) $(CPPFLAGS) -o $(OBJ)c++piglet-main.o $(SRC)c++piglet-main.cpp

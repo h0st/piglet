@@ -58,14 +58,15 @@ public:
 
 bool ShowTriple::operator()(Triple *t) MAYFAIL
 {
-  std::cout << t << "\n";
+  std::cout << t->o()._id << t->p()._id << t->s()._id << "\n";
   delete t;
   return true;
 }
 
 int main(int argc, char *argv[])
 {
-  DB db(argv[1], true);
+
+  Piglet::DB db(argv[1], true);
   db.load("http://www.w3.org/1999/02/22-rdf-syntax-ns#", true);
   db.load("http://www.w3.org/2000/01/rdf-schema#", true);
   ShowTriple show(&db);
