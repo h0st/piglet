@@ -30,7 +30,7 @@ endif
 INSTALLDIR = /usr/local/lib/
 LIBINSTALLDIR = /usr/local/include/
 
-all : library samples pystuff
+all : prepare library samples pystuff
 
 # CHEADERS added by jhonkola
 # TODO: copy also other libraries in 'make install'
@@ -114,7 +114,10 @@ pystuff : library $(SRC)pygletmodule.c $(SRC)setup.py
 #  Housekeeping
 
 clean :
-	-rm -f $(LIBRARY) c++piglet-sample cpiglet-sample $(SRC)sqlconst.h \
+	-rm -rf $(LIBRARY) c++piglet-sample cpiglet-sample $(SRC)sqlconst.h \
 	$(libobjects) $(OBJ)c++piglet-main.o $(OBJ)cpiglet-main.o \
 	$(OBJ)aqltester-main.o $(OBJ)cpiglet-main-m3.o aqltester \
 	m3-cpiglet-sample
+
+prepare:
+	-mkdir ./obj
